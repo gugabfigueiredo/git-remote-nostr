@@ -34,7 +34,7 @@ func parseRemoteURL(remoteUrl string) (string, error) {
 	// Check for SCP-like SSH URLs first because they don't have a "scheme://"
 	scpRe := regexp.MustCompile(`^[a-zA-Z0-9._@/+~-]+@[a-zA-Z0-9._@/+~-]+:[a-zA-Z0-9._@/+~-]+(\.git)?$`)
 	if scpRe.MatchString(remoteUrl) {
-		return "https", nil
+		return "ssh", nil
 	}
 
 	return "", errors.New("invalid Git URL scheme")
