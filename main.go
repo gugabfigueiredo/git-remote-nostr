@@ -181,8 +181,8 @@ func doHTTP(remoteName, remoteUrl, scheme string) error {
 }
 
 func main() {
-	logOut := openLogFile()
-	defer logOut.Close()
+	//logOut := openLogFile()
+	//defer logOut.Close()
 
 	if err := Main(); err != nil {
 		//log.Fatal(err)
