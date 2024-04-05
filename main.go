@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
+	"log"
 	"net/url"
 	"os"
 	"os/exec"
@@ -11,20 +12,20 @@ import (
 	"strings"
 )
 
-//func openLogFile() *os.File {
-//	// Specify the log file path
-//	logFile := "application.log"
-//
-//	// Attempt to open or create the log file
-//	file, err := os.OpenFile(logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
-//	if err != nil {
-//		//log.Fatalf("error opening file: %v", err)
-//	}
-//
-//	// Set the output of the logger to the file
-//	//log.SetOutput(file)
-//	return file
-//}
+func openLogFile() *os.File {
+	// Specify the log file path
+	logFile := "application.log"
+
+	// Attempt to open or create the log file
+	file, err := os.OpenFile(logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
+	if err != nil {
+		log.Fatalf("error opening file: %v", err)
+	}
+
+	// Set the output of the logger to the file
+	log.SetOutput(file)
+	return file
+}
 
 // parseRemoteURL parses the URL and returns the scheme if valid, otherwise an error.
 func parseRemoteURL(remoteUrl string) (string, error) {
@@ -49,7 +50,7 @@ func Main() (er error) {
 
 	remoteName := os.Args[1]
 	remoteUrl := os.Args[2]
-	//log.Printf("running git-remote-nostr: %s:%s\n", remoteName, remoteUrl)
+	log.Printf("running git-remote-nostr: %s:%s\n", remoteName, remoteUrl)
 
 	scheme, err := parseRemoteURL(remoteUrl)
 	if err != nil {
@@ -71,7 +72,7 @@ func doSSH(remoteName, remoteUrl string) error {
 		if err != nil {
 			return err
 		}
-		//log.Printf("ssh command: %q\n", command)
+		log.Printf("ssh command: %q\n", command)
 
 		switch {
 		case command == "capabilities\n":
@@ -100,7 +101,7 @@ func doSSH(remoteName, remoteUrl string) error {
 }
 
 func handleList(remoteUrl string) error {
-	//log.Println("git ls-remote", remoteUrl)
+	log.Println("git ls-remote", remoteUrl)
 	cmd := exec.Command("git", "ls-remote", remoteUrl)
 	cmd.Env = append(os.Environ(), "GIT_TRACE_PACKET=1", "GIT_TRACE=1")
 	cmd.Stdin = os.Stdin
@@ -113,7 +114,7 @@ func handleList(remoteUrl string) error {
 	var headHash, headTarget string
 	refs := make(map[string]string)
 	for _, line := range strings.Split(string(out), "\n") {
-		//log.Printf("line: %q\n", line)
+		log.Printf("line: %q\n", line)
 		if line == "" {
 			continue
 		}
@@ -133,12 +134,12 @@ func handleList(remoteUrl string) error {
 	}
 
 	for objectname, refname := range refs {
-		//log.Printf("%s %s\n", refname, objectname)
+		log.Printf("%s %s\n", refname, objectname)
 		_, _ = os.Stdout.WriteString(fmt.Sprintf("%s %s\n", refname, objectname))
 	}
 
 	if headTarget != "" {
-		//log.Printf("@%s HEAD \n", headTarget)
+		log.Printf("@%s HEAD \n", headTarget)
 		_, _ = os.Stdout.WriteString(fmt.Sprintf("@%s HEAD \n", headTarget))
 	}
 
@@ -148,13 +149,13 @@ func handleList(remoteUrl string) error {
 
 func handleFetch(remoteUrl, args string) error {
 	cmdParts := append([]string{"fetch", remoteUrl}, strings.Fields(args)...)
-	//log.Printf("git fetch %s %s", remoteUrl, args)
+	log.Printf("git fetch %s %s", remoteUrl, args)
 	cmd := exec.Command("git", cmdParts...)
 	cmd.Env = append(os.Environ(), "GIT_TRACE_PACKET=1", "GIT_TRACE=1")
 	cmd.Stdin = os.Stdin
 
 	out, err := cmd.Output()
-	//log.Printf("output: %s\n", out)
+	log.Printf("output: %s\n", out)
 	if err != nil {
 		return err
 	}
@@ -163,7 +164,7 @@ func handleFetch(remoteUrl, args string) error {
 }
 
 func handlePush(remoteUrl string) error {
-	//log.Printf("git push %s", remoteUrl)
+	log.Printf("git push %s", remoteUrl)
 	cmd := exec.Command("git", "push", remoteUrl)
 	cmd.Env = append(os.Environ(), "GIT_TRACE_PACKET=1", "GIT_TRACE=1")
 	cmd.Stdin = os.Stdin
@@ -172,7 +173,7 @@ func handlePush(remoteUrl string) error {
 }
 
 func doHTTP(remoteName, remoteUrl, scheme string) error {
-	//log.Printf("git %s %s %s", fmt.Sprintf("remote-%s", scheme), remoteName, remoteUrl)
+	log.Printf("git %s %s %s", fmt.Sprintf("remote-%s", scheme), remoteName, remoteUrl)
 	cmd := exec.Command("git", fmt.Sprintf("remote-%s", scheme), remoteName, remoteUrl)
 	cmd.Env = append(os.Environ(), "GIT_TRACE_PACKET=1", "GIT_TRACE=1")
 	cmd.Stdin = os.Stdin
@@ -181,10 +182,10 @@ func doHTTP(remoteName, remoteUrl, scheme string) error {
 }
 
 func main() {
-	//logOut := openLogFile()
-	//defer logOut.Close()
+	logOut := openLogFile()
+	defer logOut.Close()
 
 	if err := Main(); err != nil {
-		//log.Fatal(err)
+		log.Fatal(err)
 	}
 }
