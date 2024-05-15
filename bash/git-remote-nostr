@@ -1,0 +1,24 @@
+#!/bin/bash
+
+while read -r line; do
+    case $line in
+        capabilities)
+            echo "fetch"
+            echo "push"
+            echo
+            ;;
+        list)
+            # List references
+            git for-each-ref --format='%(refname)'
+            ;;
+        fetch*)
+            # Parse the fetch command and handle it
+            ;;
+        push*)
+            # Parse the push command and handle it
+            ;;
+        *)
+            echo "unsupported"
+            ;;
+    esac
+done
