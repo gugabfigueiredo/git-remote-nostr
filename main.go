@@ -67,24 +67,24 @@ func main() {
 	}
 }
 
-func DoConnect(command, remote string) (err error) {
+func DoConnect(command, remote string) error {
 	// Connects to given git service.
-
+	log.Printf("Connecting to git-upload-pack service at %s\n", remote)
 	auth, err := goph.UseAgent()
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	// Do something with auth
 	client, err := goph.New("git", "github.com", auth)
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	// Do something with client
 	cmd, err := client.Command(command, fmt.Sprintf("'%s'", remote))
 	if err != nil {
-		panic(err)
+		return err
 	}
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
@@ -92,11 +92,12 @@ func DoConnect(command, remote string) (err error) {
 
 	os.Stdout.WriteString("\n")
 	if err := cmd.Start(); err != nil {
-		panic(err)
+		return err
 	}
 
 	if err := cmd.Wait(); err != nil {
-		panic(err)
+		return err
 	}
-	return
+
+	return nil
 }
