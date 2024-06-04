@@ -13,7 +13,6 @@ import (
 
 func main() {
 	args := os.Args
-	log.Println("Starting git-remote-nostr", args)
 	if len(args) < 3 {
 		log.Fatal("Usage: git-remote-nostr <remoteName> <remoteUrl>")
 	}
