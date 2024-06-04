@@ -3,35 +3,14 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"github.com/melbahja/goph"
 	"github.com/pkg/errors"
 	"io"
 	"log"
 	"os"
-	"strings"
+	"os/exec"
 )
 
-var logOut *os.File
-
-func openLogFile() *os.File {
-	// Specify the log file path
-	logFile := "application.log"
-
-	// Attempt to open or create the log file
-	file, err := os.OpenFile(logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
-	if err != nil {
-		log.Fatalf("error opening file: %v", err)
-	}
-
-	// Set the output of the logger to the file
-	log.SetOutput(file)
-	return file
-}
-
 func main() {
-	logOut = openLogFile()
-	defer logOut.Close()
-
 	args := os.Args
 	log.Println("Starting git-remote-nostr", args)
 	if len(args) < 3 {
@@ -69,39 +48,10 @@ func main() {
 }
 
 func DoConnect(command, remote string) error {
-	// Creates ssh auth agent
-	auth, err := goph.Key("/home/gugabfigueiredo/.ssh/id_ed25519", "")
-	//auth, err := goph.UseAgent()
-	if err != nil {
-		return err
-	}
-
-	// Create ssh client
-	client, err := goph.New("git", "github.com", auth)
-	if err != nil {
-		return err
-	}
-
-	remote = strings.TrimPrefix(remote, "git@github.com:")
-
-	// Create command
-	cmd, err := client.Command(command, fmt.Sprintf("'%s'", remote))
-	if err != nil {
-		return err
-	}
+	cmd := exec.Command("ssh", "git@github.com", command, fmt.Sprintf("'%s'", remote))
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-
 	fmt.Println()
-	log.Printf("Connecting with %s at %s\n", command, remote)
-	if err := cmd.Start(); err != nil {
-		return err
-	}
-
-	if err := cmd.Wait(); err != nil {
-		return err
-	}
-
-	return nil
+	return cmd.Run()
 }
