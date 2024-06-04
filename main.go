@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"strings"
 )
 
 func main() {
@@ -48,6 +49,7 @@ func main() {
 }
 
 func DoConnect(command, remote string) error {
+	remote = strings.TrimPrefix(remote, "git@github.com:")
 	cmd := exec.Command("ssh", "git@github.com", command, fmt.Sprintf("'%s'", remote))
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
