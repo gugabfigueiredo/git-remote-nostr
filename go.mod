@@ -3,15 +3,15 @@ module github.com/gugabfigueiredo/git-remote-nostr
 go 1.22
 
 require (
-	github.com/melbahja/goph v1.4.0
+	github.com/go-git/go-git v4.7.0+incompatible
 	github.com/pkg/errors v0.9.1
 )
 
 require (
-	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/kr/fs v0.1.0 // indirect
-	github.com/pkg/sftp v1.13.5 // indirect
-	golang.org/x/crypto v0.6.0 // indirect
-	golang.org/x/sys v0.5.0 // indirect
-	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b // indirect
+	github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99 // indirect
+	github.com/src-d/gcfg v1.4.0 // indirect
+	golang.org/x/net v0.6.0 // indirect
+	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15 // indirect
+	gopkg.in/src-d/go-git.v4 v4.13.1 // indirect
+	gopkg.in/warnings.v0 v0.1.2 // indirect
 )

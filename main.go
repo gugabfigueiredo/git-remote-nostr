@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"github.com/go-git/go-git/plumbing/transport"
 	"github.com/pkg/errors"
 	"io"
 	"log"
@@ -17,7 +18,10 @@ func main() {
 		log.Fatal("Usage: git-remote-nostr <remoteName> <remoteUrl>")
 	}
 
-	remoteUrl := args[2]
+	remote, err := transport.NewEndpoint(args[2])
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	stdinReader := bufio.NewReader(os.Stdin)
 	for {
@@ -34,11 +38,11 @@ func main() {
 			fmt.Println("connect")
 			fmt.Println()
 		case command == "connect git-upload-pack\n":
-			if err = DoConnect("git-upload-pack", remoteUrl); err != nil {
+			if err = DoConnect("git-upload-pack", remote); err != nil {
 				log.Fatal(err)
 			}
 		case command == "connect git-receive-pack\n":
-			if err = DoConnect("git-receive-pack", remoteUrl); err != nil {
+			if err = DoConnect("git-receive-pack", remote); err != nil {
 				log.Fatal(err)
 			}
 		default:
@@ -47,12 +51,24 @@ func main() {
 	}
 }
 
-func DoConnect(command, remote string) error {
-	remote = strings.TrimPrefix(remote, "git@github.com:")
-	cmd := exec.Command("ssh", "git@github.com", command, fmt.Sprintf("'%s'", remote))
+func DoConnect(command string, remote *transport.Endpoint) error {
+	cmd := exec.Command("ssh", getRemoteLogin(remote), command, getRemotePath(remote))
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	fmt.Println()
 	return cmd.Run()
+}
+
+func getRemoteLogin(remote *transport.Endpoint) string {
+	hostAndPort := remote.Host
+	port := remote.Port
+	if port != 22 {
+		hostAndPort = fmt.Sprintf("%s:%d", hostAndPort, port)
+	}
+	return remote.User + "@" + hostAndPort
+}
+
+func getRemotePath(remote *transport.Endpoint) string {
+	return strings.TrimPrefix(remote.Path, "/")
 }
