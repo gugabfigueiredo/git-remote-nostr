@@ -1,6 +1,6 @@
 # git-remote-nostr - WIP
 
-A git remote-helper to host a remote anywhere and publish in nostr.
+A git remote-helper to add support for nostr remote urls.
 
 ## Roadmap
 
@@ -8,9 +8,9 @@ A git remote-helper to host a remote anywhere and publish in nostr.
 - [x] clone from remote url
 - [x] push to remote url
 - [x] fetch from remote url
-- [ ] create nostr client
-- [ ] parse remote url
-- [ ] fetch remote url from nostr if necessary
+- [x] parse remote url
+- [ ] fetch remote url from nostr as necessary
+- [ ] add support for single use ssh key pair as available/required by host
 
 ## Installation
 
