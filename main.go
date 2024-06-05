@@ -3,7 +3,7 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"github.com/go-git/go-git/plumbing/transport"
+	"github.com/go-git/go-git/v5/plumbing/transport"
 	"github.com/pkg/errors"
 	"io"
 	"log"
