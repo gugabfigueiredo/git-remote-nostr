@@ -6,8 +6,8 @@ A git remote-helper to add support for nostr remote urls.
 
 - [x] create git-remote-helper
 - [x] clone from remote url
-- [x] push to remote url
 - [x] fetch from remote url
+- [x] push to remote url
 - [x] parse remote url
 - [ ] fetch remote url from nostr as necessary
 - [ ] add support for single use ssh key pair as available/required by host
