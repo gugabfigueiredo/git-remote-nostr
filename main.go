@@ -5,8 +5,9 @@ import (
 	"context"
 	"fmt"
 	"github.com/go-git/go-git/v5/plumbing/transport"
-	goNostr "github.com/nbd-wtf/go-nostr"
+	"github.com/nbd-wtf/go-nostr"
 	"github.com/nbd-wtf/go-nostr/nip05"
+	"github.com/nbd-wtf/go-nostr/nip19"
 	"github.com/pkg/errors"
 	"io"
 	"log"
@@ -16,21 +17,18 @@ import (
 	"time"
 )
 
-//var env struct {
-//	Nostr nostr.Config
-//}
+func init() {
 
-//func init() {
-//	envconfig.MustProcess("GIT_NOSTR", &env.Nostr)
-//}
+}
 
 func main() {
+
 	args := os.Args
 	if len(args) < 3 {
 		log.Fatal("Usage: git-remote-nostr <remoteName> <remoteUrl>")
 	}
 
-	remote, err := resolveRemote("nostr://827742da08c7911862c23ddd4758a57ad4c3bb7c9b89034df0485674786f1644@localhost:3334/git-remote-nostr")
+	remote, err := resolveRemote(args[2])
 	if err != nil {
 		log.Fatalf("Error parsing remote: %v", err)
 	}
@@ -106,17 +104,13 @@ func resolveRemote(remoteRaw string) (*Remote, error) {
 	}
 
 	if remote.Protocol == "nostr" {
-		return fetchNostrRemote(remote)
+		return resolverNostrRemote(remote)
 	}
 
-	return nil, errors.New("remote is invalid")
+	return remote, nil
 }
 
-func resolveNostr(remoteRaw string) (*Remote, error) {
-	return nil, nil
-}
-
-func fetchNostrRemote(remote *Remote) (*Remote, error) {
+func resolverNostrRemote(remote *Remote) (*Remote, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
@@ -124,15 +118,21 @@ func fetchNostrRemote(remote *Remote) (*Remote, error) {
 		return fetchFromNip05(ctx, remote)
 	}
 
-	if goNostr.IsValidPublicKey(remote.User) {
+	if nostr.IsValidPublicKey(remote.User) {
 		return fetchWithPubKey(ctx, remote.User, remote.PrimaryRelay(), remote.Path())
 	}
 
-	//if goNostr.IsValid32ByteHex(remote.User) {
-	//	return fetchWithPubKey(ctx, makeNpub)
-	//}
+	prefix, v, err := nip19.Decode(remote.User)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to resolve nip19")
+	}
 
-	return nil, errors.New("invalid nostr remote")
+	switch prefix {
+	case "npub":
+		return fetchWithPubKey(ctx, v.(string), remote.PrimaryRelay(), remote.Path())
+	default:
+		return nil, errors.New("unsupported nip19 prefix")
+	}
 }
 
 type Remote struct {
@@ -191,7 +191,7 @@ func fetchFromNip05(ctx context.Context, nostrRemote *Remote) (*Remote, error) {
 	relays := append([]string{nostrRemote.PrimaryRelay()}, resp.Relays[pubKey]...)
 
 	for _, relay := range relays {
-		if !goNostr.IsValidRelayURL(relay) {
+		if !nostr.IsValidRelayURL(relay) {
 			continue
 		}
 
@@ -208,12 +208,12 @@ func fetchFromNip05(ctx context.Context, nostrRemote *Remote) (*Remote, error) {
 
 func fetchWithPubKey(ctx context.Context, pubKey, relay, repoId string) (*Remote, error) {
 	// now we need to use pubKey to search for the remote
-	conn, err := goNostr.RelayConnect(ctx, relay)
+	conn, err := nostr.RelayConnect(ctx, relay)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to connect to relay")
 	}
 
-	filters := []goNostr.Filter{{
+	filters := []nostr.Filter{{
 		Authors: []string{pubKey},
 		Tags: map[string][]string{
 			"d": {repoId},
