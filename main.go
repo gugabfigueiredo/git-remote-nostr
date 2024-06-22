@@ -115,7 +115,7 @@ func resolverNostrRemote(remote *Remote) (*Remote, error) {
 	defer cancel()
 
 	if nip05.IsValidIdentifier(remote.User + "@" + remote.Host) {
-		return fetchFromNip05(ctx, remote)
+		return fetchWithNip05(ctx, remote)
 	}
 
 	if nostr.IsValidPublicKey(remote.User) {
@@ -177,7 +177,7 @@ func (r *Remote) Path() string {
 	return strings.TrimPrefix(r.Endpoint.Path, "/")
 }
 
-func fetchFromNip05(ctx context.Context, nostrRemote *Remote) (*Remote, error) {
+func fetchWithNip05(ctx context.Context, nostrRemote *Remote) (*Remote, error) {
 	resp, name, err := nip05.Fetch(ctx, nostrRemote.Nip05())
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to fetch from nip05")
