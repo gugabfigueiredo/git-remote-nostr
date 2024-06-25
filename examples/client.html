@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Nostr Client Interface</title>
+    <style>
+        #messages {
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            height: 200px;
+            overflow-y: auto;
+            margin-top: 10px;
+            padding: 5px;
+        }
+
+        .msg-line {
+            margin: 0;
+            padding: 3px;
+        }
+
+        .msg-line-error {
+            margin: 0;
+            padding: 5px;
+            color: red;
+            background-color: lightpink;
+        }
+
+        .input-field {
+            width: 15%;
+            padding: 12px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            margin-top: 6px;
+            margin-bottom: 16px;
+            resize: vertical;
+        }
+    </style>
+</head>
+<body>
+<input type="text" id="relayInput" placeholder="ws://" value="ws://localhost:3334">
+<button id="connectBtn" onclick="toggleConnection()">Connect</button>
+<p></p>
+<input type="text" id="messageInput" placeholder="Enter your message here">
+<button onclick="sendTextNote()">Send</button>
+<div id="messages"></div>
+<h1>Git Repository Announcement</h1>
+<form id="repo-form" action="javascript:;" onsubmit="sendRepoAnnouncement()" method="POST">
+    <label for="repo-id">Repository Name:</label><br>
+    <input class="input-field" type="text" id="repo-id" name="repo-id" required placeholder="my-repo"><br><br>
+
+    <label for="remote">Remote URL:</label><br>
+    <input class="input-field" type="text" id="remote" name="remote" placeholder="git@github.com/user/my-repo"><br><br>
+
+    <input type="submit" value="Submit">
+</form>
+<script src="https://bundle.run/noble-secp256k1@1.2.14"></script>
+<script src="https://bundle.run/browserify-cipher@1.0.1"></script>
+<script>
+    let ws = null;
+
+    const messagesDiv = document.getElementById('messages');
+
+    const bytesToHex = bytes => bytes.reduce((str, byte) => str + byte.toString(16).padStart(2, "0"), "");
+    var { getSharedSecret, schnorr, utils } = nobleSecp256k1;
+    var sha256  = nobleSecp256k1.utils.sha256;
+    var pvtKey = '578a7db516f9e5c3ab44a692b38761acf1f0c60ff8236edefccddceddda8a89b';
+    var pubKey  = nobleSecp256k1.getPublicKey(pvtKey, true);
+    pubKey      = pubKey.substring( 2 );
+    console.log( pvtKey);
+    console.log( pubKey );
+    // get relay input
+    const relayInput = document.getElementById('relayInput');
+
+    function toggleConnection() {
+        if (ws === null) {
+            // If not connected, connect
+            ws = new WebSocket(relayInput.value); // Replace with your WebSocket server URL
+
+            ws.onopen = () => {
+                console.log('Connected to the server');
+                document.getElementById('connectBtn').textContent = 'Disconnect';
+
+                var subId   = bytesToHex( nobleSecp256k1.utils.randomPrivateKey() ).substring( 0, 16 );
+                var filter  = { }
+                var subscription = [ "REQ", subId, filter ]
+                console.log('Subscription:', subscription);
+
+                displayMessage(`Connecting to ${relayInput.value} ...`);
+                ws.send(JSON.stringify( subscription ));
+            };
+
+            ws.onmessage = async (message) => {
+                var [ type, subId, event ] = JSON.parse( message.data );
+                var { kind, content, pubkey, tags } = event || {}
+                if (!event || event === true) return;
+                console.log('event:', event);
+                // if (kind === 4) {
+                //     content = await decrypt(pvtKey, event.pubkey, content);
+                // }
+                if (kind === 30617) {
+                    const dTag = tags.filter(item => {
+                        console.log("tag:", item)
+                        return item[0] === 'd'
+                    })
+                    displayMessage(`Repository Announcement: ${pubkey}@${relayInput.value}:${dTag[0][1]}`);
+                } else {
+                    displayMessage(content);
+                }
+            };
+
+            ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+                displayError('An error occurred. Please check the console for details.');
+            };
+
+
+            ws.onclose = () => {
+                console.log('Disconnected from the server');
+                ws = null; // Ensure ws is reset to null when disconnected
+                document.getElementById('connectBtn').textContent = 'Connect';
+                displayMessage('Disconnected from the server')
+            };
+        } else {
+            // If already connected, disconnect
+            ws.close();
+        }
+    }
+
+    // Function to display messages in the scrollable area
+    function displayMessage(message) {
+        if (!message) return;
+        const messageParagraph = document.createElement('p');
+        messageParagraph.classList.add('msg-line');
+        messageParagraph.textContent = message;
+        messagesDiv.appendChild(messageParagraph);
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    }
+
+    function displayError(error) {
+        if (!error) return;
+        const errorParagraph = document.createElement('p');
+        errorParagraph.classList.add('msg-line-error');
+        errorParagraph.textContent = error;
+        messagesDiv.appendChild(errorParagraph);
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    }
+
+    async function sendTextNote() {
+        const messageInput = document.getElementById('messageInput');
+        const nostrEvent = {
+            // Example event structure; adjust according to your needs
+            pubkey: pubKey, // The public key of the sender
+            created_at: Math.floor(Date.now() / 1000),
+            kind: 1, // Example: Text note
+            tags: [],
+            content: messageInput.value,
+        };
+        await sendNostrEvent(nostrEvent);
+        messageInput.value = ''; // Clear the input after sending
+    }
+
+    async function sendNostrEvent(nostrEvent) {
+        if (ws === null) {
+            console.error('Not connected to the server');
+            displayError('Not connected to the server');
+            return;
+        }
+        let signedEvent = await getSignedEvent(nostrEvent, pvtKey);
+        console.log('signedEvent:', signedEvent);
+        ws.send(JSON.stringify(["EVENT", signedEvent])); // Send the Nostr event as a string
+    }
+    
+    async function sendRepoAnnouncement() {
+        const repoId = document.getElementById('repo-id').value;
+        const remote = document.getElementById('remote').value;
+
+        const nostrEvent = {
+            // Example event structure; adjust according to your needs
+            pubkey: pubKey, // The public key of the sender
+            created_at: Math.floor(Date.now() / 1000),
+            kind: 30617, // Example: Repository announcement
+            content: "",
+            tags: [
+                ["d", repoId],
+                ["remote", remote],
+                ["relays", relayInput.value],
+            ],
+        };
+
+        await sendNostrEvent(nostrEvent);
+        // clear form fields after sending
+        document.getElementById('repo-form').reset();
+    }
+
+    //put this right above your closing script tag
+    async function getSignedEvent(event, privateKey) {
+        const { id, signature } = await generateSignedUID(event, privateKey);
+        event.id  = id;
+        event.sig = signature;
+        return event;
+    }
+
+    async function generateSignedUID(obj, privateKey) {
+        const serialized = JSON.stringify([
+            0,                    // Reserved for future use
+            obj.pubkey,        // The sender's public key
+            obj.created_at,    // Unix timestamp
+            obj.kind,          // Message “kind” or type
+            obj.tags,          // Tags identify replies/recipients
+            obj.content        // Your note contents
+        ]);
+        const id = bytesToHex(await sha256(new TextEncoder().encode(serialized)));
+        const signature = await schnorr.sign(id, privateKey);
+        return { id, signature };
+    }
+
+</script>
+</body>
+</html>
+
