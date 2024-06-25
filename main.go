@@ -2,57 +2,50 @@ package main
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
-	"github.com/go-git/go-git/v5/plumbing/transport"
-	"github.com/pkg/errors"
+	"github.com/gugabfigueiredo/git-remote-nostr/internal/domain"
+	"github.com/gugabfigueiredo/git-remote-nostr/internal/nostr"
 	"io"
 	"log"
 	"os"
 	"os/exec"
-	"strings"
 )
 
+var nostrService domain.RemoteService
+
+func init() {
+	nostrClient := nostr.NewClient()
+	nostrService = nostr.NewService(nostrClient)
+}
+
 func main() {
+
 	args := os.Args
 	if len(args) < 3 {
 		log.Fatal("Usage: git-remote-nostr <remoteName> <remoteUrl>")
 	}
 
-	remote, err := transport.NewEndpoint(args[2])
+	remote, err := nostrService.ResolveRemote(args[2])
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("Error parsing remote: %v", err)
 	}
 
-	stdinReader := bufio.NewReader(os.Stdin)
-	for {
-		command, err := stdinReader.ReadString('\n')
-		if errors.Is(err, io.EOF) {
-			break
+	switch remote.Protocol {
+	case "ssh", "nostr":
+		if err = sshHelper(remote); err != nil {
+			log.Fatalf("failed to setup remote helper: %v", err)
 		}
-		if err != nil {
-			log.Fatal(err)
+	case "http", "https", "git":
+		if err = defaultHelper(args[1], remote); err != nil {
+			log.Fatalf("failed to setup remote helper: %v", err)
 		}
-
-		switch {
-		case command == "capabilities\n":
-			fmt.Println("connect")
-			fmt.Println()
-		case command == "connect git-upload-pack\n":
-			if err = DoConnect("git-upload-pack", remote); err != nil {
-				log.Fatal(err)
-			}
-		case command == "connect git-receive-pack\n":
-			if err = DoConnect("git-receive-pack", remote); err != nil {
-				log.Fatal(err)
-			}
-		default:
-			log.Fatalf("Unknown command: %q", command)
-		}
+	default:
+		log.Fatalf("unsupported protocol for remote url: %s", remote.String())
 	}
 }
 
-func DoConnect(command string, remote *transport.Endpoint) error {
-	cmd := exec.Command("ssh", getRemoteLogin(remote), command, getRemotePath(remote))
+func doCMD(cmd *exec.Cmd) error {
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -60,15 +53,41 @@ func DoConnect(command string, remote *transport.Endpoint) error {
 	return cmd.Run()
 }
 
-func getRemoteLogin(remote *transport.Endpoint) string {
-	hostAndPort := remote.Host
-	port := remote.Port
-	if port != 22 {
-		hostAndPort = fmt.Sprintf("%s:%d", hostAndPort, port)
-	}
-	return remote.User + "@" + hostAndPort
+func defaultHelper(remoteName string, remote *domain.Remote) error {
+	cmd := exec.Command("git", "remote-"+remote.Protocol, remoteName, remote.String())
+	return doCMD(cmd)
 }
 
-func getRemotePath(remote *transport.Endpoint) string {
-	return strings.TrimPrefix(remote.Path, "/")
+func sshHelper(remote *domain.Remote) error {
+	stdinReader := bufio.NewReader(os.Stdin)
+	for {
+		command, err := stdinReader.ReadString('\n')
+		if errors.Is(err, io.EOF) {
+			return nil
+		}
+		if err != nil {
+			return errors.Join(err, fmt.Errorf("failed to read command"))
+		}
+
+		switch {
+		case command == "capabilities\n":
+			fmt.Println("connect")
+			fmt.Println()
+		case command == "connect git-upload-pack\n":
+			if err := doConnect("git-upload-pack", remote); err != nil {
+				return err
+			}
+		case command == "connect git-receive-pack\n":
+			if err := doConnect("git-receive-pack", remote); err != nil {
+				return err
+			}
+		default:
+			return fmt.Errorf("unknown command: %s", command)
+		}
+	}
+}
+
+func doConnect(command string, remote *domain.Remote) error {
+	cmd := exec.Command("ssh", remote.Login(), command, remote.Path())
+	return doCMD(cmd)
 }

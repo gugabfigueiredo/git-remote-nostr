@@ -1,0 +1,40 @@
+version: '3.8'
+services:
+  nostr-relay:
+    build: .
+    ports:
+      - "3334:3334"
+    networks:
+      - nostr-network
+    environment:
+      - DATABASE_URL=postgres://postgres:example@nostrdb:5432/postgres?sslmode=disable
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    container_name: nostrdb
+    image: postgres
+    ports:
+      - 5432:5432
+    environment:
+      PGUSER: postgres
+      POSTGRES_DB: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: example
+    volumes:
+      - nostrdb_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready" ]
+      interval: 5s
+      timeout: 2s
+      retries: 5
+    networks:
+      - nostr-network
+
+volumes:
+  nostrdb_data:
+
+networks:
+  nostr-network:
+    driver: bridge
