@@ -2,23 +2,21 @@ package main
 
 import (
 	"bufio"
-	"context"
+	"errors"
 	"fmt"
-	"github.com/go-git/go-git/v5/plumbing/transport"
-	"github.com/nbd-wtf/go-nostr"
-	"github.com/nbd-wtf/go-nostr/nip05"
-	"github.com/nbd-wtf/go-nostr/nip19"
-	"github.com/pkg/errors"
+	"github.com/gugabfigueiredo/git-remote-nostr/internal/domain"
+	"github.com/gugabfigueiredo/git-remote-nostr/internal/nostr"
 	"io"
 	"log"
 	"os"
 	"os/exec"
-	"strings"
-	"time"
 )
 
-func init() {
+var nostrService domain.RemoteService
 
+func init() {
+	nostrClient := nostr.NewClient()
+	nostrService = nostr.NewService(nostrClient)
 }
 
 func main() {
@@ -28,27 +26,23 @@ func main() {
 		log.Fatal("Usage: git-remote-nostr <remoteName> <remoteUrl>")
 	}
 
-	remote, err := resolveRemote(args[2])
+	remote, err := nostrService.ResolveRemote(args[2])
 	if err != nil {
 		log.Fatalf("Error parsing remote: %v", err)
 	}
 
 	switch remote.Protocol {
 	case "ssh", "nostr":
-		fmt.Println("remote is ssh or nostr", remote.String())
-		if err = doSSH(remote); err != nil {
-			log.Fatalf("failed to setup remote transport: %v", err)
+		if err = sshHelper(remote); err != nil {
+			log.Fatalf("failed to setup remote helper: %v", err)
+		}
+	case "http", "https", "git":
+		if err = defaultHelper(args[1], remote); err != nil {
+			log.Fatalf("failed to setup remote helper: %v", err)
 		}
 	default:
-		if err = doDefault(args[1], remote); err != nil {
-			log.Fatalf("failed to setup remote transport: %v", err)
-		}
+		log.Fatalf("unsupported protocol for remote url: %s", remote.String())
 	}
-}
-
-func doDefault(remoteName string, remote *Remote) error {
-	cmd := exec.Command("git", "remote-"+remote.Protocol, remoteName, remote.String())
-	return doCMD(cmd)
 }
 
 func doCMD(cmd *exec.Cmd) error {
@@ -59,7 +53,12 @@ func doCMD(cmd *exec.Cmd) error {
 	return cmd.Run()
 }
 
-func doSSH(remote *Remote) error {
+func defaultHelper(remoteName string, remote *domain.Remote) error {
+	cmd := exec.Command("git", "remote-"+remote.Protocol, remoteName, remote.String())
+	return doCMD(cmd)
+}
+
+func sshHelper(remote *domain.Remote) error {
 	stdinReader := bufio.NewReader(os.Stdin)
 	for {
 		command, err := stdinReader.ReadString('\n')
@@ -67,7 +66,7 @@ func doSSH(remote *Remote) error {
 			return nil
 		}
 		if err != nil {
-			return errors.Wrap(err, "failed to read command")
+			return errors.Join(err, fmt.Errorf("failed to read command"))
 		}
 
 		switch {
@@ -75,170 +74,20 @@ func doSSH(remote *Remote) error {
 			fmt.Println("connect")
 			fmt.Println()
 		case command == "connect git-upload-pack\n":
-			//if err := doConnect("git-upload-pack", remote); err != nil {
-			//	return err
-			//}
-			fmt.Println("running git-upload-pack for", remote.String())
+			if err := doConnect("git-upload-pack", remote); err != nil {
+				return err
+			}
 		case command == "connect git-receive-pack\n":
-			//if err := doConnect("git-receive-pack", remote); err != nil {
-			//	return err
-			//}
-			fmt.Println("running git-receive-pack for", remote.String())
+			if err := doConnect("git-receive-pack", remote); err != nil {
+				return err
+			}
 		default:
-			return errors.Errorf("unknown command: %s", command)
+			return fmt.Errorf("unknown command: %s", command)
 		}
 	}
 }
 
-func doConnect(command string, remote *Remote) error {
+func doConnect(command string, remote *domain.Remote) error {
 	cmd := exec.Command("ssh", remote.Login(), command, remote.Path())
 	return doCMD(cmd)
-}
-
-func resolveRemote(remoteRaw string) (*Remote, error) {
-	// if the remote is git friendly, we can use it directly
-	remote, err := parseRemote(remoteRaw)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse remote")
-		//return resolveNostr(remoteRaw)
-	}
-
-	if remote.Protocol == "nostr" {
-		return resolverNostrRemote(remote)
-	}
-
-	return remote, nil
-}
-
-func resolverNostrRemote(remote *Remote) (*Remote, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-
-	if nip05.IsValidIdentifier(remote.User + "@" + remote.Host) {
-		return fetchWithNip05(ctx, remote)
-	}
-
-	if nostr.IsValidPublicKey(remote.User) {
-		return fetchWithPubKey(ctx, remote.User, remote.PrimaryRelay(), remote.Path())
-	}
-
-	prefix, v, err := nip19.Decode(remote.User)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to resolve nip19")
-	}
-
-	switch prefix {
-	case "npub":
-		return fetchWithPubKey(ctx, v.(string), remote.PrimaryRelay(), remote.Path())
-	default:
-		return nil, errors.New("unsupported nip19 prefix")
-	}
-}
-
-type Remote struct {
-	*transport.Endpoint
-}
-
-func parseRemote(address string) (*Remote, error) {
-	e, err := transport.NewEndpoint(address)
-	if err != nil {
-		return nil, err
-	}
-
-	return &Remote{Endpoint: e}, nil
-}
-
-func (r *Remote) Nip05() string {
-	if r.User == "" {
-		return "_@" + r.Host
-	}
-	return r.User + "@" + r.Host
-}
-
-func (r *Remote) PrimaryRelay() string {
-	hostAndPort := r.Host
-	port := r.Port
-	if port != 22 {
-		hostAndPort = fmt.Sprintf("%s:%d", hostAndPort, port)
-	}
-	return "ws://" + hostAndPort
-}
-
-func (r *Remote) Login() string {
-	hostAndPort := r.Host
-	port := r.Port
-	if port != 22 {
-		hostAndPort = fmt.Sprintf("%s:%d", hostAndPort, port)
-	}
-	return r.User + "@" + hostAndPort
-}
-
-func (r *Remote) Path() string {
-	return strings.TrimPrefix(r.Endpoint.Path, "/")
-}
-
-func fetchWithNip05(ctx context.Context, nostrRemote *Remote) (*Remote, error) {
-	resp, name, err := nip05.Fetch(ctx, nostrRemote.Nip05())
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to fetch from nip05")
-	}
-
-	pubKey, ok := resp.Names[name]
-	if !ok {
-		return nil, errors.New("no public key found")
-	}
-
-	relays := append([]string{nostrRemote.PrimaryRelay()}, resp.Relays[pubKey]...)
-
-	for _, relay := range relays {
-		if !nostr.IsValidRelayURL(relay) {
-			continue
-		}
-
-		remote, err := fetchWithPubKey(ctx, pubKey, relay, nostrRemote.Path())
-		if err != nil {
-			continue
-		}
-
-		return remote, nil
-	}
-
-	return nil, errors.New("no remote found")
-}
-
-func fetchWithPubKey(ctx context.Context, pubKey, relay, repoId string) (*Remote, error) {
-	// now we need to use pubKey to search for the remote
-	conn, err := nostr.RelayConnect(ctx, relay)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to connect to relay")
-	}
-
-	filters := []nostr.Filter{{
-		Authors: []string{pubKey},
-		Tags: map[string][]string{
-			"d": {repoId},
-		},
-	}}
-
-	// create a subscription and submit to relay
-	// results will be returned on the sub.Events channel
-	sub, _ := conn.Subscribe(ctx, filters)
-	defer sub.Unsub()
-	for {
-		select {
-		case <-sub.EndOfStoredEvents:
-			// Handle end of stored events here if needed
-			return nil, errors.New("no remote found")
-		case ev, ok := <-sub.Events:
-			if !ok {
-				// The Events channel is closed, so exit the loop
-				return nil, errors.New("no remote found")
-			}
-
-			// Handle the event here
-			if remoteTag := ev.Tags.GetFirst([]string{"remote"}); remoteTag != nil {
-				return parseRemote(remoteTag.Value())
-			}
-		}
-	}
 }
