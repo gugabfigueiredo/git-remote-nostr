@@ -37,6 +37,7 @@ $ make example-up
 ```
 
 Or connect to a known relay:
+
 ![2024-06-26_07-05.png](examples/2024-06-26_07-05.png)
 
 ## Roadmap
