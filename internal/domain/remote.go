@@ -44,7 +44,7 @@ func (r *Remote) PrimaryRelay() string {
 	if port > 0 && port != 22 {
 		hostAndPort = fmt.Sprintf("%s:%d", hostAndPort, port)
 	}
-	return "ws://" + hostAndPort
+	return "wss://" + hostAndPort
 }
 
 func (r *Remote) Login() string {
