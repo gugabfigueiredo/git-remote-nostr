@@ -9,6 +9,10 @@ Host a single remote url for your repo on nostr.
 ```sh
 $ go install github.com/gugabfigueiredo/git-remote-nostr
 ```
+To clone this repo try with this ad-hoc remote url:
+```sh
+$ git clone nostr::cc3d2bbe8530edabc1555fcdf1d93f6caed604a6eaf96f7939da47e83b52b935@relay.primal.net:git-remote-nostr
+```
 
 ## Usage
 
