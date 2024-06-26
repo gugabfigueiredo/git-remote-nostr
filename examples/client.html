@@ -63,7 +63,7 @@
     const bytesToHex = bytes => bytes.reduce((str, byte) => str + byte.toString(16).padStart(2, "0"), "");
     var { getSharedSecret, schnorr, utils } = nobleSecp256k1;
     var sha256  = nobleSecp256k1.utils.sha256;
-    var pvtKey = '578a7db516f9e5c3ab44a692b38761acf1f0c60ff8236edefccddceddda8a89b';
+    var pvtKey = bytesToHex( nobleSecp256k1.utils.randomPrivateKey() );
     var pubKey  = nobleSecp256k1.getPublicKey(pvtKey, true);
     pubKey      = pubKey.substring( 2 );
     console.log( pvtKey);
@@ -81,7 +81,7 @@
                 document.getElementById('connectBtn').textContent = 'Disconnect';
 
                 var subId   = bytesToHex( nobleSecp256k1.utils.randomPrivateKey() ).substring( 0, 16 );
-                var filter  = { }
+                var filter  = { "authors": [ pubKey ] }
                 var subscription = [ "REQ", subId, filter ]
                 console.log('Subscription:', subscription);
 
@@ -99,10 +99,12 @@
                 // }
                 if (kind === 30617) {
                     const dTag = tags.filter(item => {
-                        console.log("tag:", item)
+                        console.log("tag:", item);
                         return item[0] === 'd'
                     })
-                    displayMessage(`Repository Announcement: ${pubkey}@${relayInput.value}:${dTag[0][1]}`);
+                    const url = new URL(relayInput.value);
+                    const relayAddr = url.host + (url.port && `:${url.port}`);
+                    displayMessage(`Repository Announcement: nostr::${pubkey}@${relayAddr}:${dTag[0][1]}`);
                 } else {
                     displayMessage(content);
                 }
