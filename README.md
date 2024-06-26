@@ -27,6 +27,18 @@ clone from a nip-19 compatible identifier:
 $ git clone nostr://npub1sfm59ksgc7g3sckz8hw5wk990t2v8wmunwysxn0sfpt8g7r0zezq6y46mp@relay.str/git-remote-nostr
 ```
 
+## Examples
+
+Open [the example client](examples/client.html) in a browser to create a quick bare announcement with the required tags.
+
+Run the example client:
+```sh
+$ make example-up
+```
+
+Or connect to a known relay:
+![2024-06-26_07-05.png](examples/2024-06-26_07-05.png)
+
 ## Roadmap
 
 - [x] create git-remote-helper
