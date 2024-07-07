@@ -2,7 +2,7 @@
 
 Host your code wherever you want (github, gitlab, gitea, etc.). 
 
-Host a single remote url for your repo on nostr.
+Publish a single remote url for your repo on nostr.
 
 ## Installation
 
