@@ -7,28 +7,44 @@ Publish a single remote url for your repo on nostr.
 ## Installation
 
 ```sh
-$ go install github.com/gugabfigueiredo/git-remote-nostr
+go install github.com/gugabfigueiredo/git-remote-nostr@latest
 ```
-To clone this repo try with this ad-hoc remote url:
+
+Clone this repo with this ad-hoc remote url:
 ```sh
-$ git clone nostr::cc3d2bbe8530edabc1555fcdf1d93f6caed604a6eaf96f7939da47e83b52b935@relay.primal.net:git-remote-nostr
+git clone nostr::cc3d2bbe8530edabc1555fcdf1d93f6caed604a6eaf96f7939da47e83b52b935@relay.primal.net:git-remote-nostr
 ```
 
 ## Usage
 
+clone a repo:
+```sh
+git clone nostr::cc3d2bbe8530edabc1555fcdf1d93f6caed604a6eaf96f7939da47e83b52b935@relay.primal.net:git-remote-nostr
+```
+
+Make some changes and push them back:
+```sh
+echo "Hello, World!" > hello.txt
+git add hello.txt
+git commit -m "Add hello.txt"
+git push
+```
+
+### Nostr Identifiers Support
+
 clone from a public key:
 ```sh
-$ git clone nostr://96beaaaeffcf4ca1b1e988bc5f112602b20945b67dc27339af31bd0854bcbf47@relay.str/git-remote-nostr
+git clone nostr::cc3d2bbe8530edabc1555fcdf1d93f6caed604a6eaf96f7939da47e83b52b935@relay.primal.net:git-remote-nostr
 ```
 
 Clone from a nip-05 compatible identifier:
 ```sh
-$ git clone nostr::gugafigueiredo@primal.net:git-remote-nostr
+git clone nostr::gugafigueiredo@primal.net:git-remote-nostr
 ```
 
 clone from a nip-19 compatible identifier:
 ```sh
-$ git clone nostr://npub1sfm59ksgc7g3sckz8hw5wk990t2v8wmunwysxn0sfpt8g7r0zezq6y46mp@relay.str/git-remote-nostr
+git clone nostr://npub1sfm59ksgc7g3sckz8hw5wk990t2v8wmunwysxn0sfpt8g7r0zezq6y46mp@relay.str/git-remote-nostr
 ```
 
 ## Examples
@@ -37,7 +53,7 @@ Open [the example client](examples/client.html) in a browser to create a quick b
 
 Run the example client:
 ```sh
-$ make example-up
+make example-up
 ```
 
 Or connect to a known relay:
