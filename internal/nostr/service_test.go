@@ -223,6 +223,7 @@ func TestService_ResolveRemote(t *testing.T) {
 }
 
 type ClientStub struct {
+	IClient
 	resolveCalledWith any
 
 	resolveWithNip05Response string
@@ -232,13 +233,13 @@ type ClientStub struct {
 	resolveWithFiltersError    error
 }
 
-func (c *ClientStub) resolveWithNip05(remote *domain.Remote) (*domain.Remote, error) {
+func (c *ClientStub) ResolveWithNip05(remote *domain.Remote) (*domain.Remote, error) {
 	c.resolveCalledWith = remote.String()
 	resp, _ := domain.ParseRemote(c.resolveWithNip05Response)
 	return resp, c.resolveWithNip05Error
 }
 
-func (c *ClientStub) resolveWithFilters(relays []string, filters nostr.Filters) (*domain.Remote, error) {
+func (c *ClientStub) ResolveWithFilters(relays []string, filters nostr.Filters) (*domain.Remote, error) {
 	c.resolveCalledWith = struct {
 		relays  []string
 		filters nostr.Filters
