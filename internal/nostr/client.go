@@ -10,21 +10,29 @@ import (
 	"time"
 )
 
-type IClient interface {
-	resolveWithNip05(remote *domain.Remote) (*domain.Remote, error)
-	resolveWithFilters(relays []string, filters nostr.Filters) (*domain.Remote, error)
-}
-
 type Client struct {
+	pvtKey string
+	pubKey string
 }
 
 var _ IClient = &Client{}
 
-func NewClient() *Client {
-	return &Client{}
+func NewClient(pvtKey, pubKey string) *Client {
+	return &Client{
+		pvtKey: pvtKey,
+		pubKey: pubKey,
+	}
 }
 
-func (c *Client) resolveWithNip05(remote *domain.Remote) (*domain.Remote, error) {
+func (c *Client) PvtKey() string {
+	return c.pvtKey
+}
+
+func (c *Client) PubKey() string {
+	return c.pubKey
+}
+
+func (c *Client) ResolveWithNip05(remote *domain.Remote) (*domain.Remote, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
@@ -33,62 +41,53 @@ func (c *Client) resolveWithNip05(remote *domain.Remote) (*domain.Remote, error)
 		return nil, errors.Join(err, fmt.Errorf("failed to fetch nip05: %s", remote.Nip05()))
 	}
 
-	pubKey, ok := resp.Names[name]
+	authorPubKey, ok := resp.Names[name]
 	if !ok {
 		return nil, errors.New("no public key found")
 	}
 
-	relays := append([]string{remote.PrimaryRelay()}, resp.Relays[pubKey]...)
+	relays := append([]string{remote.PrimaryRelay()}, resp.Relays[authorPubKey]...)
 
-	return c.resolveWithFilters(relays, []nostr.Filter{{
+	return c.ResolveWithFilters(relays, []nostr.Filter{{
 		Kinds:   []int{nostr.KindRepositoryAnnouncement},
-		Authors: []string{pubKey},
-		Tags: map[string][]string{
+		Authors: []string{authorPubKey},
+		Tags: nostr.TagMap{
 			"d": {remote.Path()},
 		},
 	}})
 }
 
-func (c *Client) resolveWithFilters(relays []string, filters nostr.Filters) (*domain.Remote, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+func (c *Client) ResolveWithFilters(relays []string, filters nostr.Filters) (*domain.Remote, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
 	defer cancel()
 
-	for _, relay := range relays {
-		if !nostr.IsValidRelayURL(relay) {
-			continue
-		}
-
-		conn, err := nostr.RelayConnect(ctx, relay)
+	pool := nostr.NewSimplePool(ctx)
+	for ev := range pool.SubManyEoseNonUnique(ctx, relays, filters) {
+		remote, err := domain.ParseRemoteFromEvent(ev.Event)
 		if err != nil {
 			continue
 		}
 
-		// create a subscription and submit to relay
-		// results will be returned on the sub.Events channel
-		sub, _ := conn.Subscribe(ctx, filters)
-		for {
-			select {
-			case <-sub.EndOfStoredEvents:
-				// Handle end of stored events here if needed
-				continue
-			case ev, ok := <-sub.Events:
-				if !ok {
-					// The Events channel is closed, so exit the loop
-					continue
-				}
-
-				if remoteTag := ev.Tags.GetFirst([]string{"clone"}); remoteTag != nil {
-					return domain.ParseRemote(remoteTag.Value())
-				}
-
-				// Handle the event here
-				if remoteTag := ev.Tags.GetFirst([]string{"remote"}); remoteTag != nil {
-					return domain.ParseRemote(remoteTag.Value())
-				}
-			}
-		}
-		sub.Unsub()
+		return remote, nil
 	}
 
 	return nil, errors.New("no remote found")
+}
+
+func (c *Client) Auth(remote *domain.Remote, key string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	primary := remote.PrimaryRelay()
+	relay, err := nostr.RelayConnect(ctx, primary)
+	if err != nil {
+		return errors.Join(err, fmt.Errorf("failed to connect to relay: %s", primary))
+	}
+	defer relay.Close()
+
+	return relay.Auth(ctx, func(evt *nostr.Event) error {
+		evt.Content = key
+		evt.Tags = append(evt.Tags, nostr.Tags{{"path", remote.Path()}}...)
+		return evt.Sign(c.pvtKey)
+	})
 }
