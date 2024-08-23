@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/gugabfigueiredo/git-remote-nostr/internal/domain"
+	"github.com/gugabfigueiredo/git-remote-nostr/internal/git"
 	"github.com/gugabfigueiredo/git-remote-nostr/internal/nostr"
 	"io"
 	"log"
@@ -15,7 +16,9 @@ import (
 var nostrService domain.RemoteService
 
 func init() {
-	nostrClient := nostr.NewClient()
+	git.ProcessConfig()
+	pvtk, pubk := nostr.GetCredentials(git.Config.UserName, git.Config.UserEmail)
+	nostrClient := nostr.NewClient(pvtk, pubk)
 	nostrService = nostr.NewService(nostrClient)
 }
 
@@ -28,15 +31,15 @@ func main() {
 
 	remote, err := nostrService.ResolveRemote(args[2])
 	if err != nil {
-		log.Fatalf("Error parsing remote: %v", err)
+		log.Fatalf("Error resolving remote: %v: %s", err, args[2])
 	}
 
 	switch remote.Protocol {
-	case "ssh", "nostr":
-		if err = sshHelper(remote); err != nil {
+	case "nostr":
+		if err = nostrHelper(remote); err != nil {
 			log.Fatalf("failed to setup remote helper: %v", err)
 		}
-	case "http", "https", "git":
+	case "ssh", "http", "https", "git":
 		if err = defaultHelper(args[1], remote); err != nil {
 			log.Fatalf("failed to setup remote helper: %v", err)
 		}
@@ -58,7 +61,7 @@ func defaultHelper(remoteName string, remote *domain.Remote) error {
 	return doCMD(cmd)
 }
 
-func sshHelper(remote *domain.Remote) error {
+func nostrHelper(remote *domain.Remote) error {
 	stdinReader := bufio.NewReader(os.Stdin)
 	for {
 		command, err := stdinReader.ReadString('\n')
@@ -78,6 +81,9 @@ func sshHelper(remote *domain.Remote) error {
 				return err
 			}
 		case command == "connect git-receive-pack\n":
+			if err := nostrService.Auth(remote, ""); err != nil {
+				return fmt.Errorf("failed to request upload: %v", err)
+			}
 			if err := doConnect("git-receive-pack", remote); err != nil {
 				return err
 			}
