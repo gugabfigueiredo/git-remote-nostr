@@ -35,11 +35,11 @@ func main() {
 	}
 
 	switch remote.Protocol {
-	case "nostr":
+	case "ssh", "nostr":
 		if err = nostrHelper(remote); err != nil {
 			log.Fatalf("failed to setup remote helper: %v", err)
 		}
-	case "ssh", "http", "https", "git":
+	case "http", "https", "git":
 		if err = defaultHelper(args[1], remote); err != nil {
 			log.Fatalf("failed to setup remote helper: %v", err)
 		}

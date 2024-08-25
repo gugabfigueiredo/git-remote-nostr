@@ -34,6 +34,41 @@
             margin-bottom: 16px;
             resize: vertical;
         }
+
+
+        .maintainers-input-container {
+            display: flex;
+            flex-wrap: wrap;
+            padding: 5px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+
+        .maintainers-input-container .maintainer {
+            display: flex;
+            align-items: center;
+            background-color: #e1ecf4;
+            border: 1px solid #d5e3f3;
+            border-radius: 3px;
+            padding: 5px 10px;
+            margin: 5px;
+            font-size: 14px;
+        }
+
+        .maintainers-input-container .maintainer .remove-maintainer {
+            margin-left: 10px;
+            cursor: pointer;
+            color: #888;
+        }
+
+        .maintainers-input-container input {
+            border: none;
+            outline: none;
+            padding: 5px;
+            font-size: 14px;
+            margin: 5px;
+            flex: 1;
+        }
     </style>
 </head>
 <body>
@@ -50,6 +85,12 @@
 
     <label for="remote">Remote URL:</label><br>
     <input class="input-field" type="text" id="remote" name="remote" placeholder="git@github.com/user/my-repo"><br><br>
+
+    <label for="maintainers-input">Maintainers:</label>
+    <div class="maintainers-input-container" id="maintainers-input-container">
+        <input type="text" id="maintainers-input" placeholder="Add pubkeys or npubs..." />
+        <input type="hidden" id="hidden-maintainers-input" name="maintainers" />
+    </div>
 
     <input type="submit" value="Submit">
 </form>
@@ -70,6 +111,10 @@
     console.log( pubKey );
     // get relay input
     const relayInput = document.getElementById('relayInput');
+    const maintainersInputContainer = document.getElementById("maintainers-input-container");
+    const maintainersInput = document.getElementById("maintainers-input");
+    const hiddenMaintainerInput = document.getElementById("hidden-maintainers-input");
+    const maintainerList = [];
 
     function toggleConnection() {
         if (ws === null) {
@@ -103,7 +148,7 @@
                         return item[0] === 'd'
                     })
                     const url = new URL(relayInput.value);
-                    const relayAddr = url.host + (url.port && `:${url.port}`);
+                    const relayAddr = url.host;
                     displayMessage(`Repository Announcement: nostr::${pubkey}@${relayAddr}:${dTag[0][1]}`);
                 } else {
                     displayMessage(content);
@@ -171,10 +216,11 @@
         console.log('signedEvent:', signedEvent);
         ws.send(JSON.stringify(["EVENT", signedEvent])); // Send the Nostr event as a string
     }
-    
+
     async function sendRepoAnnouncement() {
         const repoId = document.getElementById('repo-id').value;
         const remote = document.getElementById('remote').value;
+        const maintainers = document.getElementById('hidden-maintainers-input').value;
 
         const nostrEvent = {
             // Example event structure; adjust according to your needs
@@ -185,13 +231,20 @@
             tags: [
                 ["d", repoId],
                 ["remote", remote],
+                ["clone", remote],
                 ["relays", relayInput.value],
             ],
         };
 
+        if (maintainers.length > 0) {
+            nostrEvent.tags.push(["maintainers", ...maintainers.split(',')]);
+        }
+
         await sendNostrEvent(nostrEvent);
         // clear form fields after sending
+        console.log('repo announcement:', nostrEvent);
         document.getElementById('repo-form').reset();
+        clearMaintainerElements();
     }
 
     //put this right above your closing script tag
@@ -216,6 +269,69 @@
         return { id, signature };
     }
 
+    maintainersInput.addEventListener("keydown", function (event) {
+        console.log(event.key, event.code)
+        if (event.key === " " || event.code === "Space") {
+            event.preventDefault();
+            const maintainersText = maintainersInput.value.trim();
+            if (maintainersText && !maintainerList.includes(maintainersText)) {
+                addMaintainer(maintainersText);
+                maintainersInput.value = "";
+            }
+        }
+    });
+
+    function addMaintainer(text) {
+        // Add maintainer tag to maintainer list
+        maintainerList.push(text);
+        updateHiddenInput();
+
+        // Create tag element
+        const maintainer = document.createElement("span");
+        maintainer.className = "maintainer";
+        maintainer.textContent = text;
+
+        // Create remove button
+        const removeMaintainer = document.createElement("span");
+        removeMaintainer.className = "remove-maintainer";
+        removeMaintainer.innerHTML = "&times;";
+        removeMaintainer.addEventListener("click", function () {
+            removeMaintainerElement(maintainer, text);
+        });
+
+        // Append remove button to tag
+        maintainer.appendChild(removeMaintainer);
+        // Insert tag before the input field
+        maintainersInputContainer.insertBefore(maintainer, maintainersInput);
+    }
+
+    function removeMaintainerElement(maintainerElement, text) {
+        // Remove tag from maintailersList
+        const index = maintainerList.indexOf(text);
+        if (index > -1) {
+            maintainerList.splice(index, 1);
+        }
+        updateHiddenInput();
+
+        // Remove tag element from DOM
+        maintainersInputContainer.removeChild(maintainerElement);
+    }
+
+    function clearMaintainerElements() {
+        // Clear maintainer list and hidden input
+        maintainerList.length = 0;
+        updateHiddenInput();
+
+        // Clear maintainer elements from DOM
+        const maintainerElements = document.querySelectorAll(".maintainer");
+        maintainerElements.forEach((element) => {
+            maintainersInputContainer.removeChild(element);
+        });
+    }
+
+    function updateHiddenInput() {
+        hiddenMaintainerInput.value = maintainerList.join(',');
+    }
 </script>
 </body>
 </html>

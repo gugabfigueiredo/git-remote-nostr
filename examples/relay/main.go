@@ -15,7 +15,7 @@ type settings struct {
 		Description string `envconfig:"RELAY_DESCRIPTION"`
 		IconURL     string `envconfig:"RELAY_ICON_URL"`
 	}
-	DatabaseURL string `envconfig:"DATABASE_URL"`
+	DatabaseURL string `envconfig:"DATABASE_URL" default:"postgres://postgres:example@localhost:5432/postgres?sslmode=disable"`
 }
 
 func main() {
@@ -43,8 +43,7 @@ func main() {
 		w.Write([]byte("ok"))
 	}))
 
-	fmt.Println("running on :3334")
-
+	fmt.Println("Starting relay on :3334 ...")
 	if err := http.ListenAndServe(":3334", relay); err != nil {
 		panic(err)
 	}
