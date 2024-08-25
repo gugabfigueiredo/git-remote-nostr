@@ -14,7 +14,7 @@ type IClient interface {
 	PubKey() string
 	ResolveWithNip05(remote *domain.Remote) (*domain.Remote, error)
 	ResolveWithFilters(relays []string, filters nostr.Filters) (*domain.Remote, error)
-	Auth(remote *domain.Remote, key string) error
+	Auth(remote *domain.Remote) error
 }
 
 type Service struct {

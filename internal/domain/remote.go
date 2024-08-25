@@ -10,7 +10,7 @@ import (
 
 type RemoteService interface {
 	ResolveRemote(remoteRaw string) (*Remote, error)
-	Auth(remote *Remote, key string) error
+	Auth(remote *Remote) error
 }
 
 type Remote struct {

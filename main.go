@@ -81,7 +81,7 @@ func nostrHelper(remote *domain.Remote) error {
 				return err
 			}
 		case command == "connect git-receive-pack\n":
-			if err := nostrService.Auth(remote, ""); err != nil {
+			if err := nostrService.Auth(remote); err != nil {
 				return fmt.Errorf("failed to request upload: %v", err)
 			}
 			if err := doConnect("git-receive-pack", remote); err != nil {

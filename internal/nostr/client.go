@@ -7,6 +7,8 @@ import (
 	"github.com/gugabfigueiredo/git-remote-nostr/internal/domain"
 	"github.com/nbd-wtf/go-nostr"
 	"github.com/nbd-wtf/go-nostr/nip05"
+	"github.com/nbd-wtf/go-nostr/nip11"
+	"slices"
 	"time"
 )
 
@@ -74,20 +76,55 @@ func (c *Client) ResolveWithFilters(relays []string, filters nostr.Filters) (*do
 	return nil, errors.New("no remote found")
 }
 
-func (c *Client) Auth(remote *domain.Remote, key string) error {
+func (c *Client) Auth(remote *domain.Remote) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
 	primary := remote.PrimaryRelay()
+	info, err := nip11.Fetch(ctx, primary)
+	if err != nil {
+		// if we can't fetch nip11, we must assume it's not relay; skip auth
+		return nil
+	}
+	if !info.Limitation.AuthRequired {
+		// no way to auth with this relay
+		return nil
+	}
+	if !slices.Contains(info.SupportedNIPs, 34) {
+		// not a nostr-git relay we cannot complete auth
+		return errors.New("remote is not a nostr-git relay")
+	}
+
 	relay, err := nostr.RelayConnect(ctx, primary)
 	if err != nil {
 		return errors.Join(err, fmt.Errorf("failed to connect to relay: %s", primary))
 	}
 	defer relay.Close()
 
+	authMethod := resolveAuthMethod(remote)
+
 	return relay.Auth(ctx, func(evt *nostr.Event) error {
-		evt.Content = key
-		evt.Tags = append(evt.Tags, nostr.Tags{{"path", remote.Path()}}...)
+		if err = authMethod(evt); err != nil {
+			return err
+		}
 		return evt.Sign(c.pvtKey)
 	})
+}
+
+func resolveAuthMethod(remote *domain.Remote) func(evt *nostr.Event) error {
+	switch remote.Event.Tags.GetFirst([]string{"auth-method"}).Value() {
+	case "ssh-sso":
+		return func(evt *nostr.Event) error {
+			// generate ssh-sso key pair
+			// store the private key locally and add to key agent
+			// sign the event with the public key and path
+			evt.Content = "key"
+			evt.Tags = append(evt.Tags, nostr.Tags{{"path", remote.Path()}, {"remote-id", remote.Event.ID}}...)
+			return nil
+		}
+	default:
+		return func(evt *nostr.Event) error {
+			return nil
+		}
+	}
 }
