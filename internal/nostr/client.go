@@ -9,6 +9,7 @@ import (
 	"github.com/nbd-wtf/go-nostr/nip05"
 	"github.com/nbd-wtf/go-nostr/nip11"
 	"slices"
+	"strings"
 	"time"
 )
 
@@ -83,7 +84,7 @@ func (c *Client) Auth(remote *domain.Remote) error {
 	primary := remote.PrimaryRelay()
 	info, err := nip11.Fetch(ctx, primary)
 	if err != nil {
-		// if we can't fetch nip11, we must assume it's not relay; skip auth
+		// if we can't fetch nip11, we must assume it's not relay; skip nostr auth
 		return nil
 	}
 	if !info.Limitation.AuthRequired {
@@ -101,7 +102,7 @@ func (c *Client) Auth(remote *domain.Remote) error {
 	}
 	defer relay.Close()
 
-	authMethod := resolveAuthMethod(remote)
+	authMethod := resolveAuthMethod(info, remote)
 
 	return relay.Auth(ctx, func(evt *nostr.Event) error {
 		if err = authMethod(evt); err != nil {
@@ -111,9 +112,19 @@ func (c *Client) Auth(remote *domain.Remote) error {
 	})
 }
 
-func resolveAuthMethod(remote *domain.Remote) func(evt *nostr.Event) error {
-	switch remote.Event.Tags.GetFirst([]string{"auth-method"}).Value() {
-	case "ssh-sso":
+func resolveAuthMethod(info nip11.RelayInformationDocument, remote *domain.Remote) func(evt *nostr.Event) error {
+	var method string
+	for _, tag := range info.Tags {
+		if strings.HasPrefix(tag, "auth-method:") {
+			method = strings.TrimPrefix(tag, "auth-method:")
+			break
+		}
+	}
+	if tag := remote.Event.Tags.GetFirst([]string{"auth-method"}); tag != nil {
+		method = tag.Value()
+	}
+	switch method {
+	case "ssh-pubkey":
 		return func(evt *nostr.Event) error {
 			// generate ssh-sso key pair
 			// store the private key locally and add to key agent
