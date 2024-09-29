@@ -5,17 +5,20 @@ import (
 	"fmt"
 	"github.com/go-git/go-git/v5/plumbing/transport"
 	"github.com/nbd-wtf/go-nostr"
+	"github.com/nbd-wtf/go-nostr/nip11"
 	"strings"
 )
 
 type RemoteService interface {
 	ResolveRemote(remoteRaw string) (*Remote, error)
 	Auth(remote *Remote) error
+	Helper(remote *Remote) error
 }
 
 type Remote struct {
 	*transport.Endpoint
-	Event *nostr.Event
+	Event     *nostr.Event
+	RelayInfo *nip11.RelayInformationDocument
 }
 
 func ParseRemote(address string) (*Remote, error) {
