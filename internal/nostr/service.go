@@ -25,7 +25,7 @@ func NewService(client IClient) *Service {
 	return &Service{client}
 }
 
-func (n *Service) ResolveRemote(remoteRaw string) (*domain.Remote, error) {
+func (s *Service) ResolveRemote(remoteRaw string) (*domain.Remote, error) {
 	remote, err := domain.ParseRemote(remoteRaw)
 	if err != nil {
 		return nil, errors.Join(err, fmt.Errorf("failed to parse remote: %s", remoteRaw))
@@ -34,7 +34,7 @@ func (n *Service) ResolveRemote(remoteRaw string) (*domain.Remote, error) {
 	if prefix, v, err := nip19.Decode(remote.Nip19()); err == nil {
 		switch prefix {
 		case "npub":
-			return n.ResolveWithFilters([]string{remote.PrimaryRelay()}, []nostr.Filter{{
+			return s.ResolveWithFilters([]string{remote.PrimaryRelay()}, []nostr.Filter{{
 				Kinds:   []int{nostr.KindRepositoryAnnouncement},
 				Authors: []string{v.(string)},
 				Tags: nostr.TagMap{
@@ -43,13 +43,13 @@ func (n *Service) ResolveRemote(remoteRaw string) (*domain.Remote, error) {
 			}})
 		case "nevent":
 			nevent := v.(nostr.EventPointer)
-			return n.ResolveWithFilters(nevent.Relays, []nostr.Filter{{
+			return s.ResolveWithFilters(nevent.Relays, []nostr.Filter{{
 				Kinds: []int{nostr.KindRepositoryAnnouncement},
 				IDs:   []string{nevent.ID},
 			}})
 		case "nprofile":
 			nprofile := v.(nostr.ProfilePointer)
-			return n.ResolveWithFilters(nprofile.Relays, []nostr.Filter{{
+			return s.ResolveWithFilters(nprofile.Relays, []nostr.Filter{{
 				Authors: []string{nprofile.PublicKey},
 				Kinds:   []int{nostr.KindRepositoryAnnouncement},
 				Tags: nostr.TagMap{
@@ -57,13 +57,13 @@ func (n *Service) ResolveRemote(remoteRaw string) (*domain.Remote, error) {
 				},
 			}})
 		case "note":
-			return n.ResolveWithFilters([]string{remote.PrimaryRelay()}, nostr.Filters{{
+			return s.ResolveWithFilters([]string{remote.PrimaryRelay()}, nostr.Filters{{
 				Kinds: []int{nostr.KindRepositoryAnnouncement},
 				IDs:   []string{v.(string)},
 			}})
 		case "naddr":
 			entity := v.(nostr.EntityPointer)
-			return n.ResolveWithFilters([]string{remote.PrimaryRelay()}, nostr.Filters{{
+			return s.ResolveWithFilters([]string{remote.PrimaryRelay()}, nostr.Filters{{
 				Kinds:   []int{nostr.KindRepositoryAnnouncement},
 				Authors: []string{entity.PublicKey},
 				Tags: nostr.TagMap{
@@ -76,7 +76,7 @@ func (n *Service) ResolveRemote(remoteRaw string) (*domain.Remote, error) {
 	}
 
 	if nostr.IsValidPublicKey(remote.User) {
-		return n.ResolveWithFilters([]string{remote.PrimaryRelay()}, []nostr.Filter{{
+		return s.ResolveWithFilters([]string{remote.PrimaryRelay()}, []nostr.Filter{{
 			Kinds:   []int{nostr.KindRepositoryAnnouncement},
 			Authors: []string{remote.User},
 			Tags: nostr.TagMap{
@@ -86,7 +86,7 @@ func (n *Service) ResolveRemote(remoteRaw string) (*domain.Remote, error) {
 	}
 
 	if nip05.IsValidIdentifier(remote.User + "@" + remote.Host) {
-		return n.ResolveWithNip05(remote)
+		return s.ResolveWithNip05(remote)
 	}
 
 	return nil, fmt.Errorf("unsupported nostr remote url: %s", remote.String())
