@@ -1,8 +1,9 @@
 package git
 
 import (
+	"fmt"
 	"github.com/gugabfigueiredo/git-remote-nostr/internal/domain"
-	"github.com/gugabfigueiredo/git-remote-nostr/internal/util"
+	"os"
 	"os/exec"
 )
 
@@ -25,5 +26,9 @@ func Init() {
 
 func Helper(remoteName string, remote *domain.Remote) error {
 	cmd := exec.Command("git", "remote-"+remote.Protocol, remoteName, remote.String())
-	return util.RunCMD(cmd)
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	fmt.Println()
+	return cmd.Run()
 }

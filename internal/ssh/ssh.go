@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/gugabfigueiredo/git-remote-nostr/internal/domain"
-	"github.com/gugabfigueiredo/git-remote-nostr/internal/util"
 	"io"
 	"os"
 	"os/exec"
@@ -42,5 +41,9 @@ func Helper(remote *domain.Remote) error {
 
 func doConnect(command string, remote *domain.Remote) error {
 	cmd := exec.Command("ssh", remote.Login(), command, remote.Path())
-	return util.RunCMD(cmd)
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	fmt.Println()
+	return cmd.Run()
 }
