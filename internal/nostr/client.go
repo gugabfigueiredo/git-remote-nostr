@@ -71,6 +71,16 @@ func (c *Client) ResolveWithFilters(relays []string, filters nostr.Filters) (*do
 			continue
 		}
 
+		primary := remote.PrimaryRelay()
+		info, err := nip11.Fetch(ctx, primary)
+		if err != nil {
+			// if we can't fetch nip11, we must assume it's not a relay; skip nostr auth
+			return remote, nil
+		}
+
+		remote.RelayInfo = &info
+		remote.Protocol = "nostr"
+
 		return remote, nil
 	}
 
@@ -84,11 +94,7 @@ func (c *Client) Auth(remote *domain.Remote) error {
 	primary := remote.PrimaryRelay()
 	info, err := nip11.Fetch(ctx, primary)
 	if err != nil {
-		// if we can't fetch nip11, we must assume it's not relay; skip nostr auth
-		return nil
-	}
-	if !info.Limitation.AuthRequired {
-		// no way to auth with this relay
+		// if we can't fetch nip11, we must assume it's not a relay; skip nostr auth
 		return nil
 	}
 	if !slices.Contains(info.SupportedNIPs, 34) {
@@ -102,17 +108,10 @@ func (c *Client) Auth(remote *domain.Remote) error {
 	}
 	defer relay.Close()
 
-	authMethod := resolveAuthMethod(info, remote)
-
-	return relay.Auth(ctx, func(evt *nostr.Event) error {
-		if err = authMethod(evt); err != nil {
-			return err
-		}
-		return evt.Sign(c.pvtKey)
-	})
+	return relay.Auth(ctx, ResolveAuthMethod(info, remote, c.pvtKey))
 }
 
-func resolveAuthMethod(info nip11.RelayInformationDocument, remote *domain.Remote) func(evt *nostr.Event) error {
+func ResolveAuthMethod(info nip11.RelayInformationDocument, remote *domain.Remote, pvtKey string) func(evt *nostr.Event) error {
 	var method string
 	for _, tag := range info.Tags {
 		if strings.HasPrefix(tag, "auth-method:") {
@@ -124,14 +123,14 @@ func resolveAuthMethod(info nip11.RelayInformationDocument, remote *domain.Remot
 		method = tag.Value()
 	}
 	switch method {
-	case "ssh-pubkey":
+	case "ssh-pubkey-sso":
 		return func(evt *nostr.Event) error {
 			// generate ssh-sso key pair
 			// store the private key locally and add to key agent
 			// sign the event with the public key and path
 			evt.Content = "key"
 			evt.Tags = append(evt.Tags, nostr.Tags{{"path", remote.Path()}, {"remote-id", remote.Event.ID}}...)
-			return nil
+			return evt.Sign(pvtKey)
 		}
 	default:
 		return func(evt *nostr.Event) error {

@@ -11,8 +11,8 @@ import (
 	"strings"
 )
 
-// GetCredentials tries to return a locally stored private key from your git credentials
-func GetCredentials(userName, userEmail string) (string, string) {
+// ResolveCredentials tries to return a locally stored private key from your git credentials
+func ResolveCredentials(userName, userEmail string) (string, string) {
 	// if we have a pubkey, we try to find a matching pvt key
 	if nostr.IsValidPublicKey(userName) {
 		return findKeys(userName)
