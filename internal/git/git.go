@@ -7,18 +7,16 @@ import (
 	"os/exec"
 )
 
-type config struct {
+type Config struct {
 	UserName  string
 	UserEmail string
 }
 
-var Config config
+func GetConfig() Config {
+	userName, _ := exec.Command("git", "Config", "--get", "user.name").Output()
+	userEmail, _ := exec.Command("git", "Config", "--get", "user.email").Output()
 
-func Init() {
-	userName, _ := exec.Command("git", "config", "--get", "user.name").Output()
-	userEmail, _ := exec.Command("git", "config", "--get", "user.email").Output()
-
-	Config = config{
+	return Config{
 		UserName:  string(userName),
 		UserEmail: string(userEmail),
 	}
