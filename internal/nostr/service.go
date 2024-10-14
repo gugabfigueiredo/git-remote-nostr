@@ -10,10 +10,22 @@ import (
 )
 
 type IClient interface {
+	Configer
+	Resolver
+	Auther
+}
+
+type Configer interface {
 	PvtKey() string
 	PubKey() string
+}
+
+type Resolver interface {
 	ResolveWithNip05(remote *domain.Remote) (*domain.Remote, error)
 	ResolveWithFilters(relays []string, filters nostr.Filters) (*domain.Remote, error)
+}
+
+type Auther interface {
 	Auth(remote *domain.Remote) error
 }
 
@@ -85,7 +97,7 @@ func (s *Service) ResolveRemote(remoteRaw string) (*domain.Remote, error) {
 		}})
 	}
 
-	if nip05.IsValidIdentifier(remote.User + "@" + remote.Host) {
+	if nip05.IsValidIdentifier(remote.Nip05()) {
 		return s.ResolveWithNip05(remote)
 	}
 
