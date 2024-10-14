@@ -13,8 +13,8 @@ type Config struct {
 }
 
 func GetConfig() Config {
-	userName, _ := exec.Command("git", "Config", "--get", "user.name").Output()
-	userEmail, _ := exec.Command("git", "Config", "--get", "user.email").Output()
+	userName, _ := exec.Command("git", "config", "--get", "user.name").Output()
+	userEmail, _ := exec.Command("git", "config", "--get", "user.email").Output()
 
 	return Config{
 		UserName:  string(userName),
