@@ -14,12 +14,9 @@ func main() {
 		log.Fatal("Usage: git-remote-nostr <remoteName> <remoteUrl>")
 	}
 
-	git.Init()
+	gitConfig := git.GetConfig()
 
-	pvtk, pubk := nostr.ResolveCredentials(git.Config.UserName, git.Config.UserEmail)
-	if pvtk == "" || pubk == "" {
-		log.Fatal("nostr environment is not properly configured")
-	}
+	pvtk, pubk := nostr.ResolveCredentials(gitConfig.UserName, gitConfig.UserEmail)
 
 	nostrClient := nostr.NewClient(pvtk, pubk)
 	nostrService := nostr.NewService(nostrClient)
