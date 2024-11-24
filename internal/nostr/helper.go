@@ -27,11 +27,11 @@ func (s *Service) Helper(remote *domain.Remote) error {
 			fmt.Println("connect")
 			fmt.Println()
 		case command == "connect git-upload-pack\n":
-			if err := s.doConnect("git-upload-pack", remote); err != nil {
+			if err := s.doUploadPack(remote); err != nil {
 				return err
 			}
 		case command == "connect git-receive-pack\n":
-			if err := s.doConnect("git-receive-pack", remote); err != nil {
+			if err := s.doReceivePack(remote); err != nil {
 				return err
 			}
 		default:
@@ -40,8 +40,17 @@ func (s *Service) Helper(remote *domain.Remote) error {
 	}
 }
 
-func (s *Service) doConnect(command string, remote *domain.Remote) error {
-	cmd := exec.Command("ssh", remote.Login(), command, remote.Path())
+func (s *Service) doUploadPack(remote *domain.Remote) error {
+	cmd := exec.Command("ssh", "git-upload-pack", remote.Path())
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	fmt.Println()
+	return cmd.Run()
+}
+
+func (s *Service) doReceivePack(remote *domain.Remote) error {
+	cmd := exec.Command("ssh", "git-receive-pack", remote.Path())
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
